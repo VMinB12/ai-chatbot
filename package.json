@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^0.0.60",
+    "@langchain/core": "^0.3.18",
+    "@langchain/openai": "^0.3.13",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.2",
     "@radix-ui/react-dropdown-menu": "^2.1.1",
@@ -34,6 +36,7 @@
     "drizzle-orm": "^0.34.0",
     "framer-motion": "^11.3.19",
     "geist": "^1.3.1",
+    "langchain": "^0.3.5",
     "lucide-react": "^0.446.0",
     "next": "15.0.3-canary.2",
     "next-auth": "5.0.0-beta.25",
