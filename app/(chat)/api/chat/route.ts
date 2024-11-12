@@ -1,5 +1,6 @@
 import {
   convertToCoreMessages,
+  LangChainAdapter,
   Message,
   StreamData,
   streamObject,
@@ -28,8 +29,35 @@ import {
 } from '@/lib/utils';
 
 import { generateTitleFromUserMessage } from '../../actions';
+import { ChatOpenAI } from '@langchain/openai';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
 
 export const maxDuration = 60;
+
+export async function POST(request: Request) {
+  const {
+    id,
+    messages,
+    modelId,
+  }: {
+    id: string; messages: Array<Message>; modelId: string;
+  } = await request.json();
+
+  const model = new ChatOpenAI({
+    model: modelId,
+    temperature: 0,
+  });
+
+  const stream = await model.stream(
+    messages.map(message =>
+      message.role == 'user'
+        ? new HumanMessage(message.content)
+        : new AIMessage(message.content),
+    ),
+  );
+
+  return LangChainAdapter.toDataStreamResponse(stream);
+}
 
 type AllowedTools =
   | 'createDocument'
@@ -47,7 +75,7 @@ const weatherTools: AllowedTools[] = ['getWeather'];
 
 const allTools: AllowedTools[] = [...blocksTools, ...weatherTools];
 
-export async function POST(request: Request) {
+export async function POST2(request: Request) {
   const {
     id,
     messages,
