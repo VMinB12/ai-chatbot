@@ -11,6 +11,8 @@
   "dependencies": {
     "@ai-sdk/openai": "^0.0.60",
     "@langchain/core": "^0.3.18",
+    "@langchain/langgraph": "^0.2.20",
+    "@langchain/langgraph-sdk": "^0.0.23",
     "@langchain/openai": "^0.3.13",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.2",
