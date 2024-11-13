@@ -18,6 +18,33 @@ interface ChunkData {
   chunk?: any;
 }
 
+function logChunkData(data: ChunkData) {
+  console.log(
+    'CHUNK.DATA.DATA:',
+    JSON.stringify(
+      data,
+      (key, value) => {
+        if (Array.isArray(value)) {
+          return value.map((item) =>
+            typeof item === 'object' ? JSON.stringify(item, null, 2) : item
+          );
+        }
+        return value;
+      },
+      2
+    )
+  );
+}
+
+function formatAndEnqueue(
+  controller: ReadableStreamDefaultController,
+  code: string,
+  data: any
+) {
+  const formattedData = `${code}:${JSON.stringify(data)}\n`;
+  controller.enqueue(encoder.encode(formattedData));
+}
+
 function handleChunk(
   controller: ReadableStreamDefaultController,
   event: string,
@@ -25,53 +52,42 @@ function handleChunk(
   isStreaming: boolean
 ) {
   if (event.startsWith('on_chat_model') || event.startsWith('on_tool')) {
-    console.log(
-      'CHUNK.DATA.DATA:',
-      JSON.stringify(
-        data,
-        (key, value) => {
-          if (Array.isArray(value)) {
-            return value.map((item) =>
-              typeof item === 'object' ? JSON.stringify(item, null, 2) : item
-            );
-          }
-          return value;
-        },
-        2
-      )
-    );
+    logChunkData(data);
   }
-  if (event === 'on_chat_model_end') {
-    // We check for isStreaming to avoid duplicating the message.
-    if (!isStreaming && data.output.content) {
-      const content = data.output.content;
-      const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
-      controller.enqueue(encoder.encode(formattedContent));
-    } else if (data.output.tool_calls) {
-      for (const toolCall of data.output.tool_calls) {
-        const aiSDKToolCall = {
-          toolCallId: toolCall.id,
-          toolName: toolCall.name,
-          args: toolCall.args,
-        };
-        const formattedToolCall = `${toolCallCode}:${JSON.stringify(aiSDKToolCall)}\n`;
-        controller.enqueue(encoder.encode(formattedToolCall));
+
+  switch (event) {
+    case 'on_chat_model_end':
+      if (!isStreaming && data.output.content) {
+        formatAndEnqueue(controller, aiMessageCode, data.output.content);
+      } else if (data.output.tool_calls) {
+        data.output.tool_calls.forEach((toolCall: any) => {
+          const aiSDKToolCall = {
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            args: toolCall.args,
+          };
+          formatAndEnqueue(controller, toolCallCode, aiSDKToolCall);
+        });
       }
+      break;
+
+    case 'on_chat_model_stream':
+      if (data.chunk.content) {
+        formatAndEnqueue(controller, aiMessageCode, data.chunk.content);
+      }
+      break;
+
+    case 'on_tool_end': {
+      const toolResult = {
+        toolCallId: data.output.tool_call_id,
+        result: data.output.content,
+      };
+      formatAndEnqueue(controller, toolResultCode, toolResult);
+      break;
     }
-  }
-  if (event === 'on_chat_model_stream' && data.chunk.content) {
-    const content = data.chunk.content;
-    const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
-    controller.enqueue(encoder.encode(formattedContent));
-  }
-  if (event === 'on_tool_end') {
-    const toolResult = data.output;
-    const aiSDKToolResult = {
-      toolCallId: toolResult.tool_call_id,
-      result: toolResult.content,
-    };
-    const formattedToolResult = `${toolResultCode}:${JSON.stringify(aiSDKToolResult)}\n`;
-    controller.enqueue(encoder.encode(formattedToolResult));
+
+    default:
+      break;
   }
 }
 
