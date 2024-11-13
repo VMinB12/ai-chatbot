@@ -44,12 +44,20 @@ function handleChunk(
   controller: ReadableStreamDefaultController,
   event: string,
   data: ChunkData,
-  isStreaming: boolean
+  isStreaming: boolean,
+  responseMessages: Array<Message>
 ) {
   switch (event) {
     case 'on_chat_model_end':
-      if (!isStreaming && data.output.content) {
-        formatAndEnqueue(controller, aiMessageCode, data.output.content);
+      if (data.output.content) {
+        responseMessages.push({
+          role: 'assistant',
+          content: data.output.content,
+          id: data.output.id,
+        });
+        if (!isStreaming) {
+          formatAndEnqueue(controller, aiMessageCode, data.output.content);
+        }
       } else if (data.output.tool_calls) {
         data.output.tool_calls.forEach((toolCall: any) => {
           const aiSDKToolCall = {
@@ -73,6 +81,8 @@ function handleChunk(
         toolCallId: data.output.tool_call_id,
         result: data.output.content,
       };
+      // TODO: push tool result to responseMessages
+      // responseMessages.push({ ... });
       formatAndEnqueue(controller, toolResultCode, toolResult);
       break;
     }
@@ -135,6 +145,8 @@ export async function POST(request: Request) {
   const config = { configurable: {} }; // TODO: Allow to change the model
   // We need to keep track of whether the model is streaming or not.
   let isStreaming = false;
+  // This array will store the messages that will be saved in the database
+  const responseMessages: Array<Message> = [];
 
   const streamResponse = client.runs.stream(thread['thread_id'], assistantID, {
     input,
@@ -153,11 +165,28 @@ export async function POST(request: Request) {
             controller,
             chunk.data.event,
             chunk.data.data,
-            isStreaming
+            isStreaming,
+            responseMessages
           );
         }
       }
       controller.close();
+
+      try {
+        await saveMessages({
+          messages: responseMessages.map((message) => {
+            return {
+              id: generateUUID(),
+              chatId: id,
+              role: message.role,
+              content: message.content,
+              createdAt: new Date(),
+            };
+          }),
+        });
+      } catch (error) {
+        console.error('Failed to save chat');
+      }
     },
   });
 
