@@ -3,6 +3,51 @@ import { auth } from '@/app/(auth)/auth';
 import { deleteChatById, getChatById } from '@/db/queries';
 import { Client } from '@langchain/langgraph-sdk';
 
+const encoder = new TextEncoder();
+
+// ai-sdk has various internal codes for dataStream responses.
+// see this link for information about the codes:
+// https://github.com/vercel/ai/blob/main/packages/ui-utils/src/stream-parts.ts
+const ai_code = 0;
+
+interface ChunkData {
+  output: {
+    content: string;
+    additional_kwargs: Record<string, unknown>;
+    response_metadata: Record<string, unknown>;
+    type: string;
+    name: string | null;
+    id: string;
+    example: boolean;
+    tool_calls: Array<unknown>;
+    invalid_tool_calls: Array<unknown>;
+    usage_metadata: unknown | null;
+  };
+  input: {
+    messages: Array<unknown>;
+  };
+}
+
+function handleChunk(
+  controller: ReadableStreamDefaultController,
+  event: string,
+  data: ChunkData
+) {
+  if (event.startsWith('on_chat_model')) {
+    console.log('CHUNK.DATA.DATA:', data);
+  }
+  if (event === 'on_chat_model_end') {
+    const content = data.output.content;
+    const formattedContent = `${ai_code}:${JSON.stringify(content)}\n`;
+    controller.enqueue(encoder.encode(formattedContent));
+  }
+  if (event === 'on_chat_model_stream') {
+    const content = data.output.content;
+    const formattedContent = `${ai_code}:${JSON.stringify(content)}\n`;
+    controller.enqueue(encoder.encode(formattedContent));
+  }
+}
+
 export async function POST(request: Request) {
   const {
     id,
@@ -34,57 +79,14 @@ export async function POST(request: Request) {
     streamMode: 'events',
   });
 
-  const encoder = new TextEncoder();
-
-  // ai-sdk has various internal codes for dataStream responses.
-  // see this link for information about the codes:
-  // https://github.com/vercel/ai/blob/main/packages/ui-utils/src/stream-parts.ts
-  const ai_code = 0;
-
   const stream = new ReadableStream({
     async start(controller) {
       for await (const chunk of streamResponse) {
         console.log(`Receiving new event of type: ${chunk.event}...`);
         console.log('CHUNK.DATA.EVENT:', chunk.data.event);
-        if (
-          chunk.data.event &&
-          chunk.data.event.startsWith('on_chat_model') &&
-          chunk.data.data
-        ) {
-          console.log('CHUNK.DATA.DATA:', chunk.data.data);
-          // controller.enqueue(chunk.data.data);
+        if (chunk.data.event && chunk.data.data) {
+          handleChunk(controller, chunk.data.event, chunk.data.data);
         }
-        if (
-          chunk.data.event &&
-          chunk.data.event === 'on_chat_model_end' &&
-          chunk.data.data
-        ) {
-          // Example of chunk.data.data:
-          // {
-          //   output: {
-          //     content: 'There are 10 movies in the database.',
-          //     additional_kwargs: {},
-          //     response_metadata: {},
-          //     type: 'ai',
-          //     name: null,
-          //     id: 'run-9830865a-6379-45a8-a501-cbf8d3887790-0',
-          //     example: false,
-          //     tool_calls: [],
-          //     invalid_tool_calls: [],
-          //     usage_metadata: null
-          //   },
-          //   input: { messages: [ [Array] ] }
-          // }
-          const content = chunk.data.data.output.content;
-          const formattedContent = `${ai_code}:${JSON.stringify(content)}\n`;
-          controller.enqueue(encoder.encode(formattedContent));
-        }
-        // if (chunk.event === 'events') {
-        //   controller.enqueue(chunk.data);
-        // }
-        // if (chunk.data.event === 'on_chat_model_stream') {
-        //   controller.enqueue(chunk.data?.data);
-        // }
       }
       controller.close();
     },
