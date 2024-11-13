@@ -127,7 +127,10 @@ export async function POST(request: Request) {
 
   const client = new Client({ apiUrl: 'http://langgraph-api:8000' });
   const assistantID = 'agent';
-  const thread = await client.threads.create();
+  const thread = await client.threads.create({
+    threadId: id,
+    ifExists: 'do_nothing',
+  });
   const input = { messages: [userMessage] };
   const config = { configurable: {} }; // TODO: Allow to change the model
   // We need to keep track of whether the model is streaming or not.
