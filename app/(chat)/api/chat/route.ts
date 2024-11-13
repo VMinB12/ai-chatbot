@@ -15,12 +15,14 @@ const toolResultCode = 'a';
 interface ChunkData {
   input?: any;
   output?: any;
+  chunk?: any;
 }
 
 function handleChunk(
   controller: ReadableStreamDefaultController,
   event: string,
-  data: ChunkData
+  data: ChunkData,
+  isStreaming: boolean
 ) {
   if (event.startsWith('on_chat_model') || event.startsWith('on_tool')) {
     console.log(
@@ -40,7 +42,8 @@ function handleChunk(
     );
   }
   if (event === 'on_chat_model_end') {
-    if (data.output.content) {
+    // We check for isStreaming to avoid duplicating the message.
+    if (!isStreaming && data.output.content) {
       const content = data.output.content;
       const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
       controller.enqueue(encoder.encode(formattedContent));
@@ -54,11 +57,10 @@ function handleChunk(
         const formattedToolCall = `${toolCallCode}:${JSON.stringify(aiSDKToolCall)}\n`;
         controller.enqueue(encoder.encode(formattedToolCall));
       }
-      // controller.enqueue(encoder.encode(`${toolResultCode}:\n`));
     }
   }
-  if (event === 'on_chat_model_stream') {
-    const content = data.output.content;
+  if (event === 'on_chat_model_stream' && data.chunk.content) {
+    const content = data.chunk.content;
     const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
     controller.enqueue(encoder.encode(formattedContent));
   }
@@ -88,12 +90,8 @@ export async function POST(request: Request) {
   const assistantID = 'agent';
   const thread = await client.threads.create();
 
-  const lastHumanMessage = messages.find((message) => message.role === 'user');
-  if (!lastHumanMessage) {
-    return new Response('Bad Request', { status: 400 });
-  }
   const input = {
-    messages: [lastHumanMessage],
+    messages: messages.slice(-1),
   };
 
   const config = { configurable: {} };
@@ -104,13 +102,23 @@ export async function POST(request: Request) {
     streamMode: 'events',
   });
 
+  // We need to keep track of whether the model is streaming or not.
+  let isStreaming = false;
+
   const stream = new ReadableStream({
     async start(controller) {
       for await (const chunk of streamResponse) {
-        console.log(`Receiving new event of type: ${chunk.event}...`);
         console.log('CHUNK.DATA.EVENT:', chunk.data.event);
         if (chunk.data.event && chunk.data.data) {
-          handleChunk(controller, chunk.data.event, chunk.data.data);
+          if (chunk.data.event === 'on_chat_model_stream') {
+            isStreaming = true;
+          }
+          handleChunk(
+            controller,
+            chunk.data.event,
+            chunk.data.data,
+            isStreaming
+          );
         }
       }
       controller.close();
