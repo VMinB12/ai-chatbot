@@ -1,7 +1,20 @@
-import { Message } from 'ai';
+import { convertToCoreMessages, Message } from 'ai';
+
+import { models } from '@/ai/models';
 import { auth } from '@/app/(auth)/auth';
-import { deleteChatById, getChatById } from '@/db/queries';
+import {
+  deleteChatById,
+  getChatById,
+  saveChat,
+  saveMessages,
+} from '@/db/queries';
+import { generateUUID, getMostRecentUserMessage } from '@/lib/utils';
+
+import { generateTitleFromUserMessage } from '../../actions';
+
 import { Client } from '@langchain/langgraph-sdk';
+
+export const maxDuration = 60;
 
 const encoder = new TextEncoder();
 
@@ -16,24 +29,6 @@ interface ChunkData {
   input?: any;
   output?: any;
   chunk?: any;
-}
-
-function logChunkData(data: ChunkData) {
-  console.log(
-    'CHUNK.DATA.DATA:',
-    JSON.stringify(
-      data,
-      (key, value) => {
-        if (Array.isArray(value)) {
-          return value.map((item) =>
-            typeof item === 'object' ? JSON.stringify(item, null, 2) : item
-          );
-        }
-        return value;
-      },
-      2
-    )
-  );
 }
 
 function formatAndEnqueue(
@@ -51,10 +46,6 @@ function handleChunk(
   data: ChunkData,
   isStreaming: boolean
 ) {
-  if (event.startsWith('on_chat_model') || event.startsWith('on_tool')) {
-    logChunkData(data);
-  }
-
   switch (event) {
     case 'on_chat_model_end':
       if (!isStreaming && data.output.content) {
@@ -102,15 +93,45 @@ export async function POST(request: Request) {
     modelId: string;
   } = await request.json();
 
+  const session = await auth();
+
+  if (!session || !session.user || !session.user.id) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const model = models.find((model) => model.id === modelId);
+
+  if (!model) {
+    return new Response('Model not found', { status: 404 });
+  }
+
+  const coreMessages = convertToCoreMessages(messages);
+  const userMessage = getMostRecentUserMessage(coreMessages);
+
+  if (!userMessage) {
+    return new Response('No user message found', { status: 400 });
+  }
+
+  const chat = await getChatById({ id });
+
+  if (!chat) {
+    const title = await generateTitleFromUserMessage({ message: userMessage });
+    await saveChat({ id, userId: session.user.id, title });
+  }
+
+  await saveMessages({
+    messages: [
+      { ...userMessage, id: generateUUID(), createdAt: new Date(), chatId: id },
+    ],
+  });
+
   const client = new Client({ apiUrl: 'http://langgraph-api:8000' });
   const assistantID = 'agent';
   const thread = await client.threads.create();
-
-  const input = {
-    messages: messages.slice(-1),
-  };
-
-  const config = { configurable: {} };
+  const input = { messages: [userMessage] };
+  const config = { configurable: {} }; // TODO: Allow to change the model
+  // We need to keep track of whether the model is streaming or not.
+  let isStreaming = false;
 
   const streamResponse = client.runs.stream(thread['thread_id'], assistantID, {
     input,
@@ -118,13 +139,9 @@ export async function POST(request: Request) {
     streamMode: 'events',
   });
 
-  // We need to keep track of whether the model is streaming or not.
-  let isStreaming = false;
-
   const stream = new ReadableStream({
     async start(controller) {
       for await (const chunk of streamResponse) {
-        console.log('CHUNK.DATA.EVENT:', chunk.data.event);
         if (chunk.data.event && chunk.data.data) {
           if (chunk.data.event === 'on_chat_model_stream') {
             isStreaming = true;
