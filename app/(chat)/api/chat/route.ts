@@ -8,24 +8,13 @@ const encoder = new TextEncoder();
 // ai-sdk has various internal codes for dataStream responses.
 // see this link for information about the codes:
 // https://github.com/vercel/ai/blob/main/packages/ui-utils/src/stream-parts.ts
-const ai_code = 0;
+const aiMessageCode = '0';
+const toolCallCode = '9';
+const toolResultCode = 'a';
 
 interface ChunkData {
-  output: {
-    content: string;
-    additional_kwargs: Record<string, unknown>;
-    response_metadata: Record<string, unknown>;
-    type: string;
-    name: string | null;
-    id: string;
-    example: boolean;
-    tool_calls: Array<unknown>;
-    invalid_tool_calls: Array<unknown>;
-    usage_metadata: unknown | null;
-  };
-  input: {
-    messages: Array<unknown>;
-  };
+  input?: any;
+  output?: any;
 }
 
 function handleChunk(
@@ -34,16 +23,46 @@ function handleChunk(
   data: ChunkData
 ) {
   if (event.startsWith('on_chat_model')) {
-    console.log('CHUNK.DATA.DATA:', data);
+    console.log(
+      'CHUNK.DATA.DATA:',
+      JSON.stringify(
+        data,
+        (key, value) => {
+          if (Array.isArray(value)) {
+            return value.map((item) =>
+              typeof item === 'object' ? JSON.stringify(item) : item
+            );
+          }
+          return value;
+        },
+        2
+      )
+    );
   }
   if (event === 'on_chat_model_end') {
-    const content = data.output.content;
-    const formattedContent = `${ai_code}:${JSON.stringify(content)}\n`;
-    controller.enqueue(encoder.encode(formattedContent));
+    console.log('AAAAA', data.output.content);
+    if (data.output.content) {
+      console.log('BBBBB', data.output.content);
+      const content = data.output.content;
+      const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
+      controller.enqueue(encoder.encode(formattedContent));
+    } else if (data.output.tool_calls) {
+      console.log('CCCCC', data.output.tool_calls);
+      for (const toolCall of data.output.tool_calls) {
+        const aiSDKToolCall = {
+          toolCallId: toolCall.id,
+          toolName: toolCall.name,
+          args: toolCall.args,
+        };
+        const formattedToolCall = `${toolCallCode}:${JSON.stringify(aiSDKToolCall)}\n`;
+        controller.enqueue(encoder.encode(formattedToolCall));
+      }
+      // controller.enqueue(encoder.encode(`${toolResultCode}:\n`));
+    }
   }
   if (event === 'on_chat_model_stream') {
     const content = data.output.content;
-    const formattedContent = `${ai_code}:${JSON.stringify(content)}\n`;
+    const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
     controller.enqueue(encoder.encode(formattedContent));
   }
 }
