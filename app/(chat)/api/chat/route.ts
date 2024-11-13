@@ -22,7 +22,7 @@ function handleChunk(
   event: string,
   data: ChunkData
 ) {
-  if (event.startsWith('on_chat_model')) {
+  if (event.startsWith('on_chat_model') || event.startsWith('on_tool')) {
     console.log(
       'CHUNK.DATA.DATA:',
       JSON.stringify(
@@ -30,7 +30,7 @@ function handleChunk(
         (key, value) => {
           if (Array.isArray(value)) {
             return value.map((item) =>
-              typeof item === 'object' ? JSON.stringify(item) : item
+              typeof item === 'object' ? JSON.stringify(item, null, 2) : item
             );
           }
           return value;
@@ -40,14 +40,11 @@ function handleChunk(
     );
   }
   if (event === 'on_chat_model_end') {
-    console.log('AAAAA', data.output.content);
     if (data.output.content) {
-      console.log('BBBBB', data.output.content);
       const content = data.output.content;
       const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
       controller.enqueue(encoder.encode(formattedContent));
     } else if (data.output.tool_calls) {
-      console.log('CCCCC', data.output.tool_calls);
       for (const toolCall of data.output.tool_calls) {
         const aiSDKToolCall = {
           toolCallId: toolCall.id,
@@ -64,6 +61,15 @@ function handleChunk(
     const content = data.output.content;
     const formattedContent = `${aiMessageCode}:${JSON.stringify(content)}\n`;
     controller.enqueue(encoder.encode(formattedContent));
+  }
+  if (event === 'on_tool_end') {
+    const toolResult = data.output;
+    const aiSDKToolResult = {
+      toolCallId: toolResult.tool_call_id,
+      result: toolResult.content,
+    };
+    const formattedToolResult = `${toolResultCode}:${JSON.stringify(aiSDKToolResult)}\n`;
+    controller.enqueue(encoder.encode(formattedToolResult));
   }
 }
 
