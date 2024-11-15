@@ -12,7 +12,7 @@ import { generateUUID, getMostRecentUserMessage } from '@/lib/utils';
 
 import { generateTitleFromUserMessage } from '../../actions';
 
-import { Client } from '@langchain/langgraph-sdk';
+import { Client, Config } from '@langchain/langgraph-sdk';
 
 export const maxDuration = 60;
 
@@ -142,7 +142,11 @@ export async function POST(request: Request) {
     ifExists: 'do_nothing',
   });
   const input = { messages: [userMessage] };
-  const config = { configurable: {} }; // TODO: Allow to change the model
+  const config: Config = {
+    configurable: {
+      llm: model.id,
+    },
+  };
   // We need to keep track of whether the model is streaming or not.
   let isStreaming = false;
   // This array will store the messages that will be saved in the database
