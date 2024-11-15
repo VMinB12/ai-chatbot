@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
 
 interface ToolInvocation {
   toolName: string;
@@ -14,22 +15,39 @@ interface ToolProps {
 
 const Tool: React.FC<ToolProps> = ({ toolInvocation }) => {
   const { toolName, toolCallId, state, args, result } = toolInvocation;
+  const [isOpen, setIsOpen] = useState(false);
+
+  const toggleOpen = () => {
+    setIsOpen(!isOpen);
+  };
 
   return (
-    <div
-      key={toolCallId}
-      className="tool-card p-4 border rounded-md shadow-sm bg-white"
-    >
-      <strong>{toolName}</strong>
-      <div className="tool-card p-4 border rounded-md shadow-sm bg-white">
-        Args:<pre>{JSON.stringify(args, null, 2)}</pre>
-      </div>
-      {state === 'result' && (
-        <div className="tool-card p-4 border rounded-md shadow-sm bg-white">
-          Result:<pre>{JSON.stringify(result, null, 2)}</pre>
-        </div>
+    <Card key={toolCallId} className="tool-card w-4/5 mx-0">
+      <CardHeader onClick={toggleOpen} className="cursor-pointer p-2">
+        <div className="flex items-center">{toolName}</div>
+      </CardHeader>
+      {isOpen && (
+        <CardContent>
+          <div>
+            <strong>Args:</strong>
+            <pre className="whitespace-pre-wrap break-words">
+              {JSON.stringify(args, null, 2)}
+            </pre>
+          </div>
+          {state === 'result' && (
+            <>
+              <hr className="my-2 border-gray-300" />
+              <div>
+                <strong>Result:</strong>
+                <pre className="whitespace-pre-wrap break-words">
+                  {JSON.stringify(result, null, 2)}
+                </pre>
+              </div>
+            </>
+          )}
+        </CardContent>
       )}
-    </div>
+    </Card>
   );
 };
 
