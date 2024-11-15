@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import { ToolIcon } from './icons';
 
 interface ToolInvocation {
   toolName: string;
@@ -24,7 +25,10 @@ const Tool: React.FC<ToolProps> = ({ toolInvocation }) => {
   return (
     <Card key={toolCallId} className="tool-card w-4/5 mx-0">
       <CardHeader onClick={toggleOpen} className="cursor-pointer p-2">
-        <div className="flex items-center">{toolName}</div>
+        <div className="flex items-center">
+          <ToolIcon />
+          <span className="ml-2">{toolName}</span>
+        </div>
       </CardHeader>
       {isOpen && (
         <CardContent>
