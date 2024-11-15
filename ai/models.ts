@@ -20,6 +20,12 @@ export const models: Array<Model> = [
     apiIdentifier: 'gpt-4o',
     description: 'For complex, multi-step tasks',
   },
+  {
+    id: 'dummy',
+    label: 'Dummy',
+    apiIdentifier: 'dummy',
+    description: 'Fake LLM with fixed responses for testing purposes',
+  },
 ] as const;
 
 export const DEFAULT_MODEL_NAME: string = 'gpt-4o-mini';
