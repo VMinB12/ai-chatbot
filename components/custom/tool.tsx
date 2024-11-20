@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/card';
+import React from 'react';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '../ui/accordion';
 import { ToolIcon } from './icons';
 
 interface ToolInvocation {
@@ -16,22 +21,22 @@ interface ToolProps {
 
 const Tool: React.FC<ToolProps> = ({ toolInvocation }) => {
   const { toolName, toolCallId, state, args, result } = toolInvocation;
-  const [isOpen, setIsOpen] = useState(false);
-
-  const toggleOpen = () => {
-    setIsOpen(!isOpen);
-  };
 
   return (
-    <Card key={toolCallId} className="tool-card w-4/5 mx-0">
-      <CardHeader onClick={toggleOpen} className="cursor-pointer p-2">
-        <div className="flex items-center">
-          <ToolIcon />
-          <span className="ml-2">{toolName}</span>
-        </div>
-      </CardHeader>
-      {isOpen && (
-        <CardContent>
+    <Accordion
+      key={toolCallId}
+      className="w-4/5 mx-0"
+      type="single"
+      collapsible
+    >
+      <AccordionItem value={toolCallId}>
+        <AccordionTrigger className="cursor-pointer p-2">
+          <div className="flex items-center">
+            <ToolIcon />
+            <span className="ml-2">{toolName}</span>
+          </div>
+        </AccordionTrigger>
+        <AccordionContent>
           <div>
             <strong>Args:</strong>
             <pre className="whitespace-pre-wrap break-words">
