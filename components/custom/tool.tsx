@@ -26,6 +26,12 @@ const Tool: React.FC<ToolInvocation> = ({
   args,
   result,
 }) => {
+  const renderJson = (data: any) => (
+    <pre className="whitespace-pre-wrap break-words">
+      {JSON.stringify(data, null, 2)}
+    </pre>
+  );
+
   return (
     <AccordionItem key={toolCallId} value={toolCallId}>
       <AccordionTrigger className="cursor-pointer p-2">
@@ -37,18 +43,14 @@ const Tool: React.FC<ToolInvocation> = ({
       <AccordionContent>
         <div>
           <strong>Args:</strong>
-          <pre className="whitespace-pre-wrap break-words">
-            {JSON.stringify(args, null, 2)}
-          </pre>
+          {renderJson(args)}
         </div>
-        {state === 'result' && (
+        {result && (
           <>
             <hr className="my-2 border-gray-300" />
             <div>
               <strong>Result:</strong>
-              <pre className="whitespace-pre-wrap break-words">
-                {JSON.stringify(result, null, 2)}
-              </pre>
+              {renderJson(result)}
             </div>
           </>
         )}
