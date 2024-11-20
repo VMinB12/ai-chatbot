@@ -9,7 +9,7 @@ import { Vote } from '@/db/schema';
 import { SparklesIcon } from './icons';
 import { Markdown } from './markdown';
 import { MessageActions } from './message-actions';
-import Tool from './tool';
+import Tools from './tool';
 
 export const PreviewMessage = ({
   chatId,
@@ -41,20 +41,13 @@ export const PreviewMessage = ({
         )}
 
         <div className="flex flex-col gap-2 w-full">
-          {message.toolInvocations && message.toolInvocations.length > 0 && (
-            <div className="flex flex-col gap-4">
-              {message.toolInvocations.map((toolInvocation) => (
-                <Tool
-                  key={toolInvocation.toolCallId}
-                  toolInvocation={toolInvocation}
-                />
-              ))}
-            </div>
+          {message.toolInvocations && (
+            <Tools toolInvocations={message.toolInvocations} />
           )}
 
           {message.content && (
             <div className="flex flex-col gap-4">
-              <Markdown>{message.content as string}</Markdown>
+              <Markdown>{message.content}</Markdown>
             </div>
           )}
 
